@@ -4,7 +4,9 @@
            [org.apache.lucene.analysis.standard StandardAnalyzer]
            [org.apache.lucene.util Version]
            [org.apache.lucene.index IndexWriter IndexWriterConfig IndexReader]
-           [org.apache.lucene.search IndexSearcher ScoreDoc Query]
+           [org.apache.lucene.search
+            IndexSearcher ScoreDoc Query BooleanQuery TermQuery BooleanClause$Occur
+            Filter QueryWrapperFilter]
            [org.apache.lucene.queryParser QueryParser]
            [org.apache.lucene.wordnet AnalyzerUtil])
   (:use [clojure.java.io :only (as-file)]))
@@ -23,9 +25,27 @@
 (defn parse-query [^QueryParser query-parser query-text]
   (.parse query-parser query-text))
 
-(defn search [^IndexSearcher index-searcher ^Query query ^Integer max-hits]
+(defn filterify-query [^Query query must-fields]
+  (if (instance? BooleanQuery query)
+    (let [new-query (BooleanQuery.)
+          filter-query (BooleanQuery.)]
+      (doseq [clause (.clauses query)]
+        (let [subquery (.getQuery clause)]
+          (if (and (instance? TermQuery subquery)
+                   (must-fields (.field (.getTerm subquery))))
+            (do
+              (.setOccur clause BooleanClause$Occur/MUST)
+              (.add filter-query clause))
+            (do
+              (.add new-query clause)))))
+      [new-query (QueryWrapperFilter. filter-query)])
+    [query, nil]))
+
+(defn search [^IndexSearcher index-searcher ^Query query ^Filter filter ^Integer max-hits]
   (->>
-   (.search index-searcher query max-hits)
+   (if (nil? filter)
+     (.search index-searcher query max-hits)
+     (.search index-searcher query filter max-hits))
    (.scoreDocs)
    seq
    (map
