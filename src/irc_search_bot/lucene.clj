@@ -1,6 +1,7 @@
 (ns irc-search-bot.lucene
   (:import [org.apache.lucene.document Document Field Field$Store Field$Index]
            [org.apache.lucene.store RAMDirectory FSDirectory]
+           [org.apache.lucene.analysis Analyzer KeywordTokenizer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
            [org.apache.lucene.util Version]
            [org.apache.lucene.index IndexWriter IndexWriterConfig IndexReader]
@@ -38,7 +39,10 @@
               (.add filter-query clause))
             (do
               (.add new-query clause)))))
-      [new-query (QueryWrapperFilter. filter-query)])
+      [new-query
+       (if (.isEmpty (.clauses filter-query))
+         nil
+         (QueryWrapperFilter. filter-query))])
     [query, nil]))
 
 (defn search [^IndexSearcher index-searcher ^Query query ^Filter filter ^Integer max-hits]
@@ -97,5 +101,15 @@
 (defn standard-analyzer []
   (StandardAnalyzer. *lucene-version*))
 
-(defn stemmer-analyzer []
-  (AnalyzerUtil/getPorterStemmerAnalyzer (standard-analyzer)))
+(defn stemmer-analyzer [delegate-analyzer]
+  (AnalyzerUtil/getPorterStemmerAnalyzer delegate-analyzer))
+
+(defn selective-analyzer [delegate-analyzer analyzable-fields]
+  (proxy [Analyzer] []
+    (tokenStream [field rdr]
+      (if (analyzable-fields field)
+        (.tokenStream delegate-analyzer field rdr)
+        (KeywordTokenizer. rdr)))))
+
+(defn logging-analyzer [delegate-analyzer]
+  (AnalyzerUtil/getLoggingAnalyzer delegate-analyzer System/out "log"))

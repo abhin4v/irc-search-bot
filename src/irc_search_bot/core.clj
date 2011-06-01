@@ -12,7 +12,11 @@
 
 (def *chat-log* (atom []))
 
-(def *analyzer* (standard-analyzer))
+(def *analyzer*
+  (logging-analyzer
+   (selective-analyzer
+    (stemmer-analyzer (standard-analyzer))
+    #{"message"})))
 
 (def *max-hits* 3)
 
@@ -35,17 +39,18 @@
   
 (defn search-chat-log [index-searcher query-str max-hits analyzer]
   (let [qp (query-parser :message analyzer)
-        [query filter] (filterify-query (parse-query qp query-str) #{"user"})
+        raw-query (parse-query qp query-str)
+        [query filter] (filterify-query raw-query #{"user"})
         hits (search index-searcher query filter max-hits)]
-    (println ">>" (count hits) "hits for query:" query)
-    (println query)
-    (println filter)
+    (println "Query:" query)
+    (println "Filter:" filter)
+    (println ">>" (count hits) "hits for query:" query-str)
     (map
-     #(let [timestamp (-> % :doc :timestamp (Long/parseLong))]
+     #(let [timestamp (-> % :doc :timestamp (Long/parseLong))
+            delta (floor (/ (- (System/currentTimeMillis) timestamp) 1000))]
         (format
          "[%s] %s: %s"
-         (fuzzy-relative-time
-          (floor (/ (- (System/currentTimeMillis) timestamp) 1000)))
+         (fuzzy-relative-time delta)
          (-> % :doc :user)
          (-> % :doc :message)))
      hits)))
