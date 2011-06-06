@@ -7,7 +7,7 @@
            [org.apache.lucene.index IndexWriter IndexWriterConfig IndexReader]
            [org.apache.lucene.search
             IndexSearcher ScoreDoc Query BooleanQuery TermQuery BooleanClause
-            BooleanClause$Occur Filter QueryWrapperFilter]
+            BooleanClause$Occur Filter QueryWrapperFilter Sort SortField]
            [org.apache.lucene.queryParser QueryParser]
            [org.apache.lucene.wordnet AnalyzerUtil])
   (:use [clojure.java.io :only (as-file)]))
@@ -46,7 +46,15 @@
     [query, nil]))
 
 (defn search [^IndexSearcher index-searcher ^Query query ^Filter filter ^Integer max-hits]
-  (let [top-docs (.search index-searcher query filter max-hits)]
+  (let [top-docs
+        (.search
+         index-searcher
+         query
+         filter
+         max-hits
+         (Sort.
+          (into-array
+           [SortField/FIELD_SCORE (SortField. "timestamp" SortField/LONG true)])))]
     (vector
      (.totalHits top-docs)
      (->>
@@ -98,7 +106,7 @@
 
 (defn add-document [^IndexWriter index-writer document]
   (.addDocument index-writer document))
-  
+
 (defn standard-analyzer []
   (StandardAnalyzer. *lucene-version*))
 

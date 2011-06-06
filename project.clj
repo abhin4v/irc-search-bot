@@ -6,7 +6,7 @@
                   :releases false}}
   :dependencies [[org.clojure/clojure "1.2.1"]
                  [org.clojure/clojure-contrib "1.2.0"]
-                 [org.apache.lucene/lucene-core "3.1.0"]
-                 [org.apache.lucene/lucene-wordnet "3.1.0"]
-                 [org.apache.lucene/lucene-analyzers "3.1.0"]
+                 [org.apache.lucene/lucene-core "3.2.0"]
+                 [org.apache.lucene/lucene-wordnet "3.2.0"]
+                 [org.apache.lucene/lucene-analyzers "3.2.0"]
                  [org/pircbotx "1.3-SNAPSHOT"]])

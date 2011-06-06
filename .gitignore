@@ -5,4 +5,4 @@ pom.xml
 /classes/
 .lein-deps-sum
 ignored_users
-/index/
+/index*/
