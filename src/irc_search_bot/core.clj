@@ -10,7 +10,7 @@
         [clojure.java.io :only (reader as-file)]
         [clojure.contrib.math :only (floor)]))
 
-(def *index-dir* (fs-directory "index"))
+(defn index-dir [bot] (fs-directory (str "index-" (.getNick bot))))
 
 (def *chat-log* (atom []))
 
@@ -42,27 +42,29 @@
   (let [qp (query-parser :message analyzer)
         raw-query (parse-query qp query-str)
         [query filter] (filterify-query raw-query #{"user"})
-        hits (search index-searcher query filter max-hits)]
+        [total hits] (search index-searcher query filter max-hits)]
     (println "Query:" query)
     (println "Filter:" filter)
-    (println ">>" (count hits) "hits for query:" query-str)
-    (map
-     #(let [timestamp (-> % :doc :timestamp (Long/parseLong))
-            delta (floor (/ (- (System/currentTimeMillis) timestamp) 1000))]
-        (format
-         "[%s] %s: %s"
-         (fuzzy-relative-time delta)
-         (-> % :doc :user)
-         (-> % :doc :message)))
-     hits)))
+    (println ">>" total "hits for query:" query-str)
+    (vector
+     total
+     (map
+      #(let [timestamp (-> % :doc :timestamp (Long/parseLong))
+             delta (floor (/ (- (System/currentTimeMillis) timestamp) 1000))]
+         (format
+          "[%s] %s: %s"
+          (fuzzy-relative-time delta)
+          (-> % :doc :user)
+          (-> % :doc :message)))
+      hits))))
 
-(defn schedule-index-chat-log []
+(defn schedule-index-chat-log [bot]
   (let [executor (Executors/newSingleThreadScheduledExecutor)]
     (.scheduleWithFixedDelay
      executor
      (fn []
        (try
-        (with-open [iw (index-writer *index-dir* *analyzer*)]
+        (with-open [iw (index-writer (index-dir bot) *analyzer*)]
           (let [chat-log @*chat-log*]
             (do
               (reset! *chat-log* [])
@@ -86,17 +88,21 @@
         timestamp (.getTimestamp ev)
         channel (.getChannel ev)]
     (if (.startsWith msg "!q")
-      (with-open [is (index-searcher *index-dir*)]
-        (let [results (search-chat-log is (trim (subs msg 2)) *max-hits* *analyzer*)]
-          (if (zero? (count results))
+      (with-open [is (index-searcher (index-dir bot))]
+        (let [[total results] (search-chat-log is (trim (subs msg 2)) *max-hits* *analyzer*)]
+          (if (zero? total)
             (send-message bot channel "No results found")
-            (doseq [result results]
-              (send-message bot channel result)))))
+            (do
+              (send-message
+               bot channel
+               (str total " results found. Top " (count results) " results:"))
+              (doseq [result results]
+                (send-message bot channel result))))))
       (when (and (not (.startsWith msg "!")) (not (*ignored-users* user)))
         (swap! *chat-log* conj [timestamp user msg])))))
 
 (defn run-bot [bot-name server channel]
   (let [bot (make-bot bot-name)]
     (connect-bot bot server channel)
-    (schedule-index-chat-log)
+    (schedule-index-chat-log bot)
     bot))

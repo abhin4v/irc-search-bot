@@ -46,27 +46,28 @@
     [query, nil]))
 
 (defn search [^IndexSearcher index-searcher ^Query query ^Filter filter ^Integer max-hits]
-  (->>
-   (if (nil? filter)
-     (.search index-searcher query max-hits)
-     (.search index-searcher query filter max-hits))
-   (.scoreDocs)
-   seq
-   (map
-    (fn [^ScoreDoc sd]
-      (hash-map
-       :score (.score sd)
-       :doc
-       (->>
-        (.doc index-searcher (.doc sd))
-        (.getFields)
-        seq
-        (reduce
-         (fn [m ^Field f]
-           (assoc m
-             (keyword (.name f))
-             (if (.isBinary f) (.getBinaryValue f) (.stringValue f))))
-         {})))))))
+  (let [top-docs (.search index-searcher query filter max-hits)]
+    (vector
+     (.totalHits top-docs)
+     (->>
+      top-docs
+      (.scoreDocs)
+      seq
+      (map
+       (fn [^ScoreDoc sd]
+         (hash-map
+          :score (.score sd)
+          :doc
+          (->>
+           (.doc index-searcher (.doc sd))
+           (.getFields)
+           seq
+           (reduce
+            (fn [m ^Field f]
+              (assoc m
+                (keyword (.name f))
+                (if (.isBinary f) (.getBinaryValue f) (.stringValue f))))
+            {})))))))))
 
 (defn fs-directory [dir-path]
   (FSDirectory/open (as-file dir-path)))
