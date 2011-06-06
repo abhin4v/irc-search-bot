@@ -1,6 +1,8 @@
 (ns irc-search-bot.core
   (:import [java.util.concurrent Executors TimeUnit]
-           [java.util Date])
+           [java.util Date]
+           [org.pircbotx PircBotX Channel]
+           [org.pircbotx.hooks Event])
   (:use [irc-search-bot.bot]
         [irc-search-bot.lucene]
         [irc-search-bot.util]
@@ -13,10 +15,9 @@
 (def *chat-log* (atom []))
 
 (def *analyzer*
-  (logging-analyzer
-   (selective-analyzer
-    (stemmer-analyzer (standard-analyzer))
-    #{"message"})))
+  (selective-analyzer
+   (stemmer-analyzer (standard-analyzer))
+   #{"message"}))
 
 (def *max-hits* 3)
 
@@ -27,7 +28,7 @@
     #{}))
 
 (defn index-chat-log [index-writer chat-log]
-  (doseq [[timestamp user message] chat-log]
+  (doseq [[^Long timestamp user message] chat-log]
     (do
       (println (format "[%tr] %s: %s" (Date. timestamp) user message))
       (add-document
@@ -70,16 +71,16 @@
           (.printStackTrace e))))
      10 10 TimeUnit/SECONDS)))
 
-(defmethod event-listener :disconnect [bot ev]
+(defmethod event-listener :disconnect [^PircBotX bot ^Event ev]
   (do
     (.connect bot (.getServer bot))
     (doseq [channel (.getChannelNames bot)]
       (.joinChannel bot channel))))
 
-(defmethod event-listener :kick [bot ev]
+(defmethod event-listener :kick [^PircBotX bot ^Event ev]
   (join-channel bot (.getChannel ev)))
 
-(defmethod event-listener :message [bot ev]
+(defmethod event-listener :message [^PircBotX bot ^Event ev]
   (let [msg (trim (.getMessage ev))
         user (.. ev getUser getNick)
         timestamp (.getTimestamp ev)

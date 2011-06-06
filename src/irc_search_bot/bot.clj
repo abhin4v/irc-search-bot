@@ -6,7 +6,7 @@
 (defn spy [o] (do (println o) o))
 
 (defmulti event-listener
-  (fn [bot event]
+  (fn [^PircBotX bot ^Event event]
     (->>
      event
      class
@@ -22,6 +22,7 @@
 (defn make-bot [name]
   (doto (PircBotX.)
     (.setName name)
+    (.setLogin name)
     (..
      (getListenerManager)
      (addListener
@@ -42,14 +43,14 @@
 (defn disconnect-bot [^PircBotX bot]
   (doto bot (.disconnect)))
 
-(defn join-channel [bot channel]
+(defn join-channel [^PircBotX bot channel]
   (doto bot
     (.joinChannel
      (if (instance? Channel channel)
-       (.getName channel)
+       (.getName ^Channel channel)
        channel))))
 
-(defn send-message [bot channel message]
+(defn send-message [^PircBotX bot channel message]
   (doto bot
     (.sendMessage
      (if (instance? Channel channel)

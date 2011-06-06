@@ -6,18 +6,18 @@
            [org.apache.lucene.util Version]
            [org.apache.lucene.index IndexWriter IndexWriterConfig IndexReader]
            [org.apache.lucene.search
-            IndexSearcher ScoreDoc Query BooleanQuery TermQuery BooleanClause$Occur
-            Filter QueryWrapperFilter]
+            IndexSearcher ScoreDoc Query BooleanQuery TermQuery BooleanClause
+            BooleanClause$Occur Filter QueryWrapperFilter]
            [org.apache.lucene.queryParser QueryParser]
            [org.apache.lucene.wordnet AnalyzerUtil])
   (:use [clojure.java.io :only (as-file)]))
 
 (def *lucene-version* Version/LUCENE_30)
 
-(defn index-writer [directory analyzer]
+(defn ^IndexWriter index-writer [directory analyzer]
   (IndexWriter. directory (IndexWriterConfig. *lucene-version* analyzer)))
 
-(defn index-searcher [directory]
+(defn ^IndexSearcher index-searcher [directory]
   (IndexSearcher. (IndexReader/open directory)))
 
 (defn query-parser [default-field-name analyzer]
@@ -30,10 +30,10 @@
   (if (instance? BooleanQuery query)
     (let [new-query (BooleanQuery.)
           filter-query (BooleanQuery.)]
-      (doseq [clause (.clauses query)]
+      (doseq [^BooleanClause clause (.clauses ^BooleanQuery query)]
         (let [subquery (.getQuery clause)]
           (if (and (instance? TermQuery subquery)
-                   (must-fields (.field (.getTerm subquery))))
+                   (must-fields (.field (.getTerm ^TermQuery subquery))))
             (do
               (.setOccur clause BooleanClause$Occur/MUST)
               (.add filter-query clause))
@@ -104,7 +104,7 @@
 (defn stemmer-analyzer [delegate-analyzer]
   (AnalyzerUtil/getPorterStemmerAnalyzer delegate-analyzer))
 
-(defn selective-analyzer [delegate-analyzer analyzable-fields]
+(defn selective-analyzer [^Analyzer delegate-analyzer analyzable-fields]
   (proxy [Analyzer] []
     (tokenStream [field rdr]
       (if (analyzable-fields field)
