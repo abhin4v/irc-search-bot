@@ -45,7 +45,8 @@
          (QueryWrapperFilter. filter-query))])
     [query, nil]))
 
-(defn search [^IndexSearcher index-searcher ^Query query ^Filter filter ^Integer max-hits]
+(defn search
+  [^IndexSearcher index-searcher ^Query query ^Filter filter ^Integer max-hits ^String timestamp-field]
   (let [top-docs
         (.search
          index-searcher
@@ -54,7 +55,7 @@
          max-hits
          (Sort.
           (into-array
-           [SortField/FIELD_SCORE (SortField. "timestamp" SortField/LONG true)])))]
+           [SortField/FIELD_SCORE (SortField. timestamp-field SortField/LONG true)])))]
     (vector
      (.totalHits top-docs)
      (->>

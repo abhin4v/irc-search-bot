@@ -1,5 +1,5 @@
 (ns irc-search-bot.bot
-  (:import [org.pircbotx PircBotX Channel]
+  (:import [org.pircbotx PircBotX Channel User]
            [org.pircbotx.hooks Event Listener])
   (:use [clojure.string :only [join lower-case]]))
 
@@ -53,7 +53,11 @@
 (defn send-message [^PircBotX bot channel message]
   (doto bot
     (.sendMessage
-     (if (instance? Channel channel)
-       channel
-       (.getChannel bot channel))
+     (if (instance? Channel channel) channel (.getChannel bot channel))
+     message)))
+
+(defn send-prv-message [^PircBotX bot user message]
+  (doto bot
+    (.sendMessage
+     (if (instance? User user) user (.getUser bot user))
      message)))

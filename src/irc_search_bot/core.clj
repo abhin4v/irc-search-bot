@@ -19,7 +19,9 @@
    (stemmer-analyzer (standard-analyzer))
    #{"message"}))
 
-(def *max-hits* 3)
+(def *msg-max-hits* 3)
+
+(def *prv-msg-max-hits* 5)
 
 (def *ignored-users*
   (if (.exists (as-file "ignored_users"))
@@ -42,7 +44,7 @@
   (let [qp (query-parser :message analyzer)
         raw-query (parse-query qp query-str)
         [query filter] (filterify-query raw-query #{"user"})
-        [total hits] (search index-searcher query filter max-hits)]
+        [total hits] (search index-searcher query filter max-hits "timestamp")]
     (println "Query:" query)
     (println "Filter:" filter)
     (println ">>" total "hits for query:" query-str)
@@ -86,20 +88,42 @@
   (let [msg (trim (.getMessage ev))
         user (.. ev getUser getNick)
         timestamp (.getTimestamp ev)
-        channel (.getChannel ev)]
+        channel (.getChannel ev)
+        query (trim (subs msg 2))]
     (if (.startsWith msg "!q")
       (with-open [is (index-searcher (index-dir bot))]
-        (let [[total results] (search-chat-log is (trim (subs msg 2)) *max-hits* *analyzer*)]
+        (let [[total results]
+              (search-chat-log is query *msg-max-hits* *analyzer*)]
           (if (zero? total)
-            (send-message bot channel "No results found")
+            (send-message bot channel (format "No results found for \"%s\"" query))
             (do
               (send-message
                bot channel
-               (str total " results found. Top " (count results) " results:"))
+               (format "%s results found for \"%s\". Top %s results:"
+                       total query (count results)))
               (doseq [result results]
                 (send-message bot channel result))))))
       (when (and (not (.startsWith msg "!")) (not (*ignored-users* user)))
         (swap! *chat-log* conj [timestamp user msg])))))
+
+(defmethod event-listener :private-message [^PircBotX bot ^Event ev]
+  (let [msg (trim (.getMessage ev))
+        user (.. ev getUser getNick)
+        timestamp (.getTimestamp ev)
+        query (trim (subs msg 2))]
+    (when (.startsWith msg "!q")
+      (with-open [is (index-searcher (index-dir bot))]
+        (let [[total results]
+              (search-chat-log is query *prv-msg-max-hits* *analyzer*)]
+          (if (zero? total)
+            (send-prv-message bot user (format "No results found for \"%s\"" query))
+            (do
+              (send-prv-message
+               bot user
+               (format "%s results found for \"%s\". Top %s results:"
+                       total query (count results)))
+              (doseq [result results]
+                (send-prv-message bot user result)))))))))
 
 (defn run-bot [bot-name server channel]
   (let [bot (make-bot bot-name)]
